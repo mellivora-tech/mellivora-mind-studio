@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  # 数据库 (Neon 替代品，本地开发用)
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mms_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 缓存 (Upstash 替代品，本地开发用)
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  # API 网关
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PACKAGE: mms-api-gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+    depends_on:
+      - agent-service
+      - api-service
+
+  # Agent 服务
+  agent-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PACKAGE: mms-agent-service
+    environment:
+      - AGENT_PORT=3141
+      - DATABASE_URL=postgres://user:password@postgres:5432/mms_db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+
+  # 业务 API 服务
+  api-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PACKAGE: mms-api-service
+    environment:
+      - PORT=3001
+      - DATABASE_URL=postgres://user:password@postgres:5432/mms_db
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
