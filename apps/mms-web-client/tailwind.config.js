@@ -7,27 +7,40 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: "#030712", // Deep dark background
-        surface: "#111827",    // Card background
-        primary: {
-          DEFAULT: "#3B82F6",  // Blue-500
-          glow: "#60A5FA",     // Blue-400
-        },
-        accent: {
-          DEFAULT: "#F59E0B",  // Amber-500 for AI
-          glow: "#FBBF24",     // Amber-400
-        },
-        glass: {
-          border: "rgba(255, 255, 255, 0.1)",
-          surface: "rgba(255, 255, 255, 0.05)",
-        }
+        background: "#030712", // Deep dark background (fallback)
+        canvas: "#131722",     // TV Main BG
+        surface: "#1E222D",    // TV Card BG
+        
+        // Text
+        primary: "#D1D4DC",    // Main Text
+        secondary: "#787B86",  // Muted Text
+        
+        // Borders
+        base: "#2A2E39",       // Subtle Border
+        
+        // Brand & Status
+        brand: "#2962FF",      // TV Blue
+        up: "#089981",         // TV Green (slightly darker than pure #00B594 for better contrast)
+        down: "#F23645",       // TV Red
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', 'Inter', 'Roboto', 'Arial', 'sans-serif'],
       },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'hero-glow': 'conic-gradient(from 180deg at 50% 50%, #2a8af6 0deg, #a853ba 180deg, #e92a67 360deg)',
+      container: {
+        center: true,
+        padding: '1.5rem',
+        screens: {
+          '2xl': '1440px',
+        },
+      },
+      animation: {
+        'scroll-left': 'scroll-left 40s linear infinite',
+      },
+      keyframes: {
+        'scroll-left': {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        }
       }
     },
   },

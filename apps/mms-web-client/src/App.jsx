@@ -1,13 +1,9 @@
-import { Component } from 'solid-js';
 import MainLayout from './components/layout/MainLayout';
 import MarketsPage from './pages/MarketsPage';
-
-const App: Component = () => {
-  return (
-    <MainLayout>
+const App = () => {
+    return (<MainLayout>
       <MarketsPage />
-    </MainLayout>
-  );
+    </MainLayout>);
 };
-
 export default App;
+//# sourceMappingURL=App.jsx.map
