@@ -1,0 +1,271 @@
+syntax = "proto3";
+
+package mellivora.risk;
+
+option go_package = "github.com/mellivora-mind/mellivora-mind-studio/gen/go/risk";
+
+import "google/protobuf/timestamp.proto";
+import "common/types.proto";
+
+// ============================================================================
+// Risk Models
+// ============================================================================
+
+// Barra-style factor names
+enum BarraFactor {
+  BARRA_FACTOR_UNSPECIFIED = 0;
+  BARRA_FACTOR_SIZE = 1;
+  BARRA_FACTOR_BETA = 2;
+  BARRA_FACTOR_MOMENTUM = 3;
+  BARRA_FACTOR_RESIDUAL_VOLATILITY = 4;
+  BARRA_FACTOR_NON_LINEAR_SIZE = 5;
+  BARRA_FACTOR_BOOK_TO_PRICE = 6;
+  BARRA_FACTOR_LIQUIDITY = 7;
+  BARRA_FACTOR_EARNINGS_YIELD = 8;
+  BARRA_FACTOR_GROWTH = 9;
+  BARRA_FACTOR_LEVERAGE = 10;
+}
+
+// Factor exposure for a security
+message FactorExposure {
+  common.SecurityId security_id = 1;
+  common.Date date = 2;
+  map<string, double> style_exposures = 3;     // factor_name -> exposure
+  map<string, double> industry_exposures = 4;  // industry_code -> 0/1
+  double specific_risk = 5;                    // Idiosyncratic risk
+}
+
+// Factor covariance matrix
+message FactorCovariance {
+  common.Date date = 1;
+  repeated string factor_names = 2;
+  repeated double values = 3;  // Flattened NxN matrix (row-major)
+  int32 size = 4;              // N
+}
+
+// Portfolio risk decomposition
+message RiskDecomposition {
+  common.Decimal total_risk = 1;           // Total portfolio risk (volatility)
+  common.Decimal systematic_risk = 2;      // Factor-driven risk
+  common.Decimal specific_risk = 3;        // Idiosyncratic risk
+  common.Decimal tracking_error = 4;       // vs benchmark
+  
+  // Factor contributions
+  repeated FactorContribution factor_contributions = 5;
+  
+  // Top risk contributors
+  repeated StockRiskContribution top_contributors = 6;
+}
+
+message FactorContribution {
+  string factor_name = 1;
+  common.Decimal exposure = 2;
+  common.Decimal contribution = 3;         // Contribution to total risk
+  common.Decimal contribution_pct = 4;     // Percentage of total risk
+}
+
+message StockRiskContribution {
+  common.SecurityId security_id = 1;
+  string name = 2;
+  common.Decimal weight = 3;
+  common.Decimal marginal_contribution = 4;  // MCTR
+  common.Decimal contribution = 5;           // Weight * MCTR
+  common.Decimal contribution_pct = 6;
+}
+
+// VaR result
+message VaRResult {
+  common.Decimal var_95 = 1;    // 95% VaR
+  common.Decimal var_99 = 2;    // 99% VaR
+  common.Decimal cvar_95 = 3;   // 95% CVaR (Expected Shortfall)
+  common.Decimal cvar_99 = 4;   // 99% CVaR
+  string method = 5;            // HISTORICAL, PARAMETRIC, MONTE_CARLO
+}
+
+// Stress test scenario
+message StressScenario {
+  string scenario_id = 1;
+  string name = 2;
+  string description = 3;
+  map<string, double> factor_shocks = 4;  // factor_name -> shock (%)
+  map<string, double> index_shocks = 5;   // index_code -> shock (%)
+}
+
+message StressTestResult {
+  string scenario_id = 1;
+  string scenario_name = 2;
+  common.Decimal portfolio_impact = 3;     // Expected P&L impact
+  common.Decimal portfolio_impact_pct = 4;
+  repeated FactorContribution factor_impacts = 5;
+}
+
+// ============================================================================
+// Service Definitions
+// ============================================================================
+
+service RiskService {
+  // Factor exposures
+  rpc GetFactorExposure(GetFactorExposureRequest) returns (GetFactorExposureResponse);
+  rpc GetPortfolioExposure(GetPortfolioExposureRequest) returns (GetPortfolioExposureResponse);
+
+  // Covariance matrix
+  rpc GetFactorCovariance(GetFactorCovarianceRequest) returns (GetFactorCovarianceResponse);
+
+  // Risk calculation
+  rpc CalculatePortfolioRisk(CalculatePortfolioRiskRequest) returns (CalculatePortfolioRiskResponse);
+  rpc DecomposeRisk(DecomposeRiskRequest) returns (DecomposeRiskResponse);
+
+  // VaR
+  rpc CalculateVaR(CalculateVaRRequest) returns (CalculateVaRResponse);
+
+  // Stress testing
+  rpc RunStressTest(RunStressTestRequest) returns (RunStressTestResponse);
+  rpc ListStressScenarios(ListStressScenariosRequest) returns (ListStressScenariosResponse);
+
+  // Risk limits
+  rpc CheckRiskLimits(CheckRiskLimitsRequest) returns (CheckRiskLimitsResponse);
+  rpc SetRiskLimits(SetRiskLimitsRequest) returns (SetRiskLimitsResponse);
+
+  // Risk report
+  rpc GenerateRiskReport(GenerateRiskReportRequest) returns (GenerateRiskReportResponse);
+}
+
+// ============================================================================
+// Request/Response Messages
+// ============================================================================
+
+message GetFactorExposureRequest {
+  common.SecurityId security_id = 1;
+  common.Date date = 2;
+}
+
+message GetFactorExposureResponse {
+  FactorExposure exposure = 1;
+}
+
+message PortfolioHolding {
+  common.SecurityId security_id = 1;
+  common.Decimal weight = 2;
+}
+
+message GetPortfolioExposureRequest {
+  repeated PortfolioHolding holdings = 1;
+  common.Date date = 2;
+}
+
+message PortfolioFactorExposure {
+  map<string, double> style_exposures = 1;
+  map<string, double> industry_exposures = 2;
+}
+
+message GetPortfolioExposureResponse {
+  PortfolioFactorExposure exposure = 1;
+  PortfolioFactorExposure benchmark_exposure = 2;
+  PortfolioFactorExposure active_exposure = 3;
+}
+
+message GetFactorCovarianceRequest {
+  common.Date date = 1;
+}
+
+message GetFactorCovarianceResponse {
+  FactorCovariance covariance = 1;
+}
+
+message CalculatePortfolioRiskRequest {
+  repeated PortfolioHolding holdings = 1;
+  common.Date date = 2;
+}
+
+message CalculatePortfolioRiskResponse {
+  common.Decimal total_risk = 1;
+  common.Decimal daily_vol = 2;
+  common.Decimal annual_vol = 3;
+}
+
+message DecomposeRiskRequest {
+  repeated PortfolioHolding holdings = 1;
+  repeated PortfolioHolding benchmark = 2;  // Optional benchmark
+  common.Date date = 3;
+}
+
+message DecomposeRiskResponse {
+  RiskDecomposition decomposition = 1;
+}
+
+message CalculateVaRRequest {
+  repeated PortfolioHolding holdings = 1;
+  common.Decimal portfolio_value = 2;
+  int32 horizon_days = 3;           // 1, 5, 10, etc.
+  string method = 4;                // HISTORICAL, PARAMETRIC, MONTE_CARLO
+  int32 lookback_days = 5;          // For historical VaR
+}
+
+message CalculateVaRResponse {
+  VaRResult var = 1;
+}
+
+message RunStressTestRequest {
+  repeated PortfolioHolding holdings = 1;
+  common.Decimal portfolio_value = 2;
+  repeated string scenario_ids = 3;  // Empty = run all
+}
+
+message RunStressTestResponse {
+  repeated StressTestResult results = 1;
+}
+
+message ListStressScenariosRequest {}
+
+message ListStressScenariosResponse {
+  repeated StressScenario scenarios = 1;
+}
+
+// Risk limits
+message RiskLimit {
+  string limit_id = 1;
+  string limit_type = 2;  // FACTOR, INDUSTRY, STOCK, TRACKING_ERROR
+  string target = 3;      // factor_name, industry_code, stock_code, etc.
+  common.Decimal min_value = 4;
+  common.Decimal max_value = 5;
+}
+
+message LimitBreachInfo {
+  RiskLimit limit = 1;
+  common.Decimal current_value = 2;
+  bool breached = 3;
+  string severity = 4;  // WARNING, BREACH
+}
+
+message CheckRiskLimitsRequest {
+  string account_id = 1;
+  repeated PortfolioHolding holdings = 2;
+}
+
+message CheckRiskLimitsResponse {
+  repeated LimitBreachInfo breaches = 1;
+  bool all_passed = 2;
+}
+
+message SetRiskLimitsRequest {
+  string account_id = 1;
+  repeated RiskLimit limits = 2;
+}
+
+message SetRiskLimitsResponse {
+  repeated RiskLimit limits = 1;
+}
+
+message GenerateRiskReportRequest {
+  string account_id = 1;
+  common.Date date = 2;
+}
+
+message GenerateRiskReportResponse {
+  string report_id = 1;
+  string report_url = 2;
+  RiskDecomposition decomposition = 3;
+  VaRResult var = 4;
+  repeated StressTestResult stress_tests = 5;
+  repeated LimitBreachInfo limit_checks = 6;
+}

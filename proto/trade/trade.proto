@@ -1,0 +1,225 @@
+syntax = "proto3";
+
+package mellivora.trade;
+
+option go_package = "github.com/mellivora-mind/mellivora-mind-studio/gen/go/trade";
+
+import "google/protobuf/timestamp.proto";
+import "common/types.proto";
+
+// ============================================================================
+// Deal Model
+// ============================================================================
+
+// Deal (trade execution) entity
+message Deal {
+  // Basic info
+  string deal_id = 1;
+  string order_id = 2;
+  string account_id = 3;
+  common.SecurityId security_id = 4;
+  string name = 5;
+  common.Side side = 6;
+  common.Exchange exchange = 7;
+
+  // Deal details
+  common.Decimal quantity = 10;
+  common.Decimal price = 11;
+  common.Decimal amount = 12;
+  google.protobuf.Timestamp deal_time = 13;
+  common.DealType deal_type = 14;
+
+  // Fees
+  common.Decimal commission = 20;
+  common.Decimal stamp_duty = 21;
+  common.Decimal transfer_fee = 22;
+  common.Decimal other_fee = 23;
+  common.Decimal total_fee = 24;
+
+  // Execution quality
+  common.Decimal market_price = 30;  // Market price at deal time
+  common.Decimal slippage = 31;
+  common.Decimal impact_cost = 32;
+  common.Decimal vwap_price = 33;    // Period VWAP
+  common.Decimal vwap_deviation = 34;
+
+  // Reference
+  string channel = 40;
+  string external_deal_id = 41;  // ID from trading channel
+
+  // Metadata
+  map<string, string> metadata = 50;
+}
+
+// Fee configuration
+message FeeConfig {
+  string broker = 1;
+  common.Decimal commission_rate = 2;     // Commission rate (e.g., 0.0003)
+  common.Decimal min_commission = 3;      // Minimum commission
+  common.Decimal stamp_duty_rate = 4;     // Stamp duty (sell only, 0.001)
+  common.Decimal transfer_fee_rate = 5;   // Transfer fee (0.00002)
+  bool stamp_duty_buy = 6;                // Whether stamp duty applies to buy
+}
+
+// ============================================================================
+// Service Definitions
+// ============================================================================
+
+service TradeService {
+  // Deal CRUD
+  rpc GetDeal(GetDealRequest) returns (GetDealResponse);
+  rpc ListDeals(ListDealsRequest) returns (ListDealsResponse);
+
+  // Deal processing (called by trading channel callback)
+  rpc ProcessDeal(ProcessDealRequest) returns (ProcessDealResponse);
+
+  // Fee configuration
+  rpc GetFeeConfig(GetFeeConfigRequest) returns (GetFeeConfigResponse);
+  rpc SetFeeConfig(SetFeeConfigRequest) returns (SetFeeConfigResponse);
+
+  // Analysis
+  rpc GetDealAnalysis(GetDealAnalysisRequest) returns (GetDealAnalysisResponse);
+  rpc GetCostAnalysis(GetCostAnalysisRequest) returns (GetCostAnalysisResponse);
+
+  // Reconciliation
+  rpc Reconcile(ReconcileRequest) returns (ReconcileResponse);
+
+  // Real-time updates (streaming)
+  rpc StreamDeals(StreamDealsRequest) returns (stream Deal);
+}
+
+// ============================================================================
+// Request/Response Messages
+// ============================================================================
+
+message GetDealRequest {
+  string deal_id = 1;
+}
+
+message GetDealResponse {
+  Deal deal = 1;
+}
+
+message ListDealsRequest {
+  string account_id = 1;
+  string order_id = 2;
+  common.Date date = 3;
+  common.SecurityId security_id = 4;
+  common.PageRequest page = 5;
+}
+
+message ListDealsResponse {
+  repeated Deal deals = 1;
+  common.PageResponse page = 2;
+}
+
+// Process deal from channel callback
+message ProcessDealRequest {
+  string order_id = 1;
+  common.SecurityId security_id = 2;
+  common.Side side = 3;
+  common.Decimal quantity = 4;
+  common.Decimal price = 5;
+  google.protobuf.Timestamp deal_time = 6;
+  common.DealType deal_type = 7;
+  string channel = 8;
+  string external_deal_id = 9;
+  map<string, string> metadata = 10;
+}
+
+message ProcessDealResponse {
+  Deal deal = 1;
+}
+
+message GetFeeConfigRequest {
+  string broker = 1;
+}
+
+message GetFeeConfigResponse {
+  FeeConfig config = 1;
+}
+
+message SetFeeConfigRequest {
+  FeeConfig config = 1;
+}
+
+message SetFeeConfigResponse {
+  FeeConfig config = 1;
+}
+
+// Deal analysis
+message DealQualityStats {
+  common.Decimal avg_price_improvement = 1;  // vs market price
+  common.Decimal execution_efficiency = 2;
+  common.Decimal avg_market_impact = 3;
+  common.Decimal avg_vwap_deviation = 4;
+}
+
+message TimeDistribution {
+  string time_bucket = 1;  // e.g., "09:30-10:00"
+  int64 deal_count = 2;
+  common.Decimal total_amount = 3;
+  common.Decimal avg_slippage = 4;
+}
+
+message GetDealAnalysisRequest {
+  string account_id = 1;
+  common.Date start_date = 2;
+  common.Date end_date = 3;
+}
+
+message GetDealAnalysisResponse {
+  DealQualityStats quality = 1;
+  repeated TimeDistribution time_distribution = 2;
+  int64 total_deals = 3;
+  common.Decimal total_amount = 4;
+}
+
+// Cost analysis
+message CostBreakdown {
+  common.Decimal commission = 1;
+  common.Decimal stamp_duty = 2;
+  common.Decimal transfer_fee = 3;
+  common.Decimal other_fee = 4;
+  common.Decimal total_explicit = 5;    // Sum of above
+  common.Decimal slippage = 6;          // Implicit cost
+  common.Decimal market_impact = 7;     // Implicit cost
+  common.Decimal total_implicit = 8;    // Sum of implicit
+  common.Decimal total_cost = 9;        // Total all costs
+  common.Decimal cost_rate = 10;        // Cost / Traded amount
+}
+
+message GetCostAnalysisRequest {
+  string account_id = 1;
+  common.Date start_date = 2;
+  common.Date end_date = 3;
+}
+
+message GetCostAnalysisResponse {
+  CostBreakdown costs = 1;
+  common.Decimal traded_amount = 2;
+}
+
+// Reconciliation
+message ReconcileRequest {
+  string account_id = 1;
+  common.Date date = 2;
+}
+
+message ReconcileResult {
+  bool matched = 1;
+  int64 our_deal_count = 2;
+  int64 channel_deal_count = 3;
+  common.Decimal our_amount = 4;
+  common.Decimal channel_amount = 5;
+  repeated string discrepancies = 6;
+}
+
+message ReconcileResponse {
+  ReconcileResult result = 1;
+}
+
+// Streaming
+message StreamDealsRequest {
+  string account_id = 1;
+}

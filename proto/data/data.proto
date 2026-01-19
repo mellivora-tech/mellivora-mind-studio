@@ -1,0 +1,295 @@
+syntax = "proto3";
+
+package mellivora.data;
+
+option go_package = "github.com/mellivora-mind/mellivora-mind-studio/gen/go/data";
+
+import "google/protobuf/timestamp.proto";
+import "common/types.proto";
+
+// ============================================================================
+// Data Models
+// ============================================================================
+
+// Stock info
+message StockInfo {
+  common.SecurityId security_id = 1;
+  string name = 2;
+  string full_name = 3;
+  common.Date list_date = 4;
+  common.Date delist_date = 5;
+  bool is_st = 6;
+  bool is_suspended = 7;
+  common.Industry industry = 8;
+  common.Decimal total_shares = 9;
+  common.Decimal float_shares = 10;
+}
+
+// Index info
+message IndexInfo {
+  common.SecurityId security_id = 1;
+  string name = 2;
+  string description = 3;
+  common.Date launch_date = 4;
+  int32 component_count = 5;
+}
+
+// Index component weight
+message IndexWeight {
+  common.SecurityId index_id = 1;
+  common.SecurityId stock_id = 2;
+  common.Date date = 3;
+  common.Decimal weight = 4;
+}
+
+// Trading calendar
+message TradingCalendar {
+  string market = 1;  // A_SHARE, HK, FUTURES
+  repeated common.Date trading_days = 2;
+}
+
+// Real-time quote
+message Quote {
+  common.SecurityId security_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  common.Decimal last_price = 3;
+  common.Decimal prev_close = 4;
+  common.Decimal open = 5;
+  common.Decimal high = 6;
+  common.Decimal low = 7;
+  common.Decimal volume = 8;
+  common.Decimal amount = 9;
+  common.Decimal change = 10;
+  common.Decimal change_pct = 11;
+  
+  // Order book (5 levels)
+  repeated common.PriceQty bids = 12;
+  repeated common.PriceQty asks = 13;
+  
+  // Limits
+  common.Decimal upper_limit = 14;
+  common.Decimal lower_limit = 15;
+  bool is_suspended = 16;
+}
+
+// ============================================================================
+// Service Definitions
+// ============================================================================
+
+service DataService {
+  // Stock info
+  rpc GetStockInfo(GetStockInfoRequest) returns (GetStockInfoResponse);
+  rpc ListStocks(ListStocksRequest) returns (ListStocksResponse);
+  rpc GetStockUniverse(GetStockUniverseRequest) returns (GetStockUniverseResponse);
+  
+  // Index
+  rpc GetIndexInfo(GetIndexInfoRequest) returns (GetIndexInfoResponse);
+  rpc GetIndexWeights(GetIndexWeightsRequest) returns (GetIndexWeightsResponse);
+  
+  // Calendar
+  rpc GetTradingCalendar(GetTradingCalendarRequest) returns (GetTradingCalendarResponse);
+  rpc IsTradingDay(IsTradingDayRequest) returns (IsTradingDayResponse);
+  rpc GetNextTradingDay(GetNextTradingDayRequest) returns (GetNextTradingDayResponse);
+  
+  // Historical data
+  rpc GetOHLCV(GetOHLCVRequest) returns (GetOHLCVResponse);
+  rpc GetAdjustedOHLCV(GetAdjustedOHLCVRequest) returns (GetAdjustedOHLCVResponse);
+  
+  // Real-time data
+  rpc GetQuote(GetQuoteRequest) returns (GetQuoteResponse);
+  rpc GetQuotes(GetQuotesRequest) returns (GetQuotesResponse);
+  rpc SubscribeQuotes(SubscribeQuotesRequest) returns (stream Quote);
+  
+  // Industry
+  rpc GetStockIndustry(GetStockIndustryRequest) returns (GetStockIndustryResponse);
+  rpc ListIndustries(ListIndustriesRequest) returns (ListIndustriesResponse);
+  
+  // Data update
+  rpc TriggerDataUpdate(TriggerDataUpdateRequest) returns (TriggerDataUpdateResponse);
+  rpc GetDataUpdateStatus(GetDataUpdateStatusRequest) returns (GetDataUpdateStatusResponse);
+}
+
+// ============================================================================
+// Request/Response Messages
+// ============================================================================
+
+// Stock info
+message GetStockInfoRequest {
+  common.SecurityId security_id = 1;
+}
+
+message GetStockInfoResponse {
+  StockInfo stock = 1;
+}
+
+message ListStocksRequest {
+  common.Exchange exchange = 1;
+  bool include_delisted = 2;
+  bool include_suspended = 3;
+  common.PageRequest page = 4;
+}
+
+message ListStocksResponse {
+  repeated StockInfo stocks = 1;
+  common.PageResponse page = 2;
+}
+
+enum StockUniverse {
+  STOCK_UNIVERSE_UNSPECIFIED = 0;
+  STOCK_UNIVERSE_ALL = 1;        // All A-shares
+  STOCK_UNIVERSE_CSI300 = 2;     // CSI 300
+  STOCK_UNIVERSE_CSI500 = 3;     // CSI 500
+  STOCK_UNIVERSE_CSI1000 = 4;    // CSI 1000
+  STOCK_UNIVERSE_CSI800 = 5;     // CSI 800 (300+500)
+  STOCK_UNIVERSE_CUSTOM = 6;     // Custom universe
+}
+
+message GetStockUniverseRequest {
+  StockUniverse universe = 1;
+  common.Date date = 2;
+  bool exclude_st = 3;
+  bool exclude_suspended = 4;
+  bool exclude_new = 5;           // Exclude stocks listed < N days
+  int32 min_list_days = 6;
+}
+
+message GetStockUniverseResponse {
+  repeated common.SecurityId stocks = 1;
+  int32 count = 2;
+}
+
+// Index
+message GetIndexInfoRequest {
+  common.SecurityId index_id = 1;
+}
+
+message GetIndexInfoResponse {
+  IndexInfo index = 1;
+}
+
+message GetIndexWeightsRequest {
+  common.SecurityId index_id = 1;
+  common.Date date = 2;
+}
+
+message GetIndexWeightsResponse {
+  repeated IndexWeight weights = 1;
+}
+
+// Calendar
+message GetTradingCalendarRequest {
+  string market = 1;
+  common.Date start_date = 2;
+  common.Date end_date = 3;
+}
+
+message GetTradingCalendarResponse {
+  TradingCalendar calendar = 1;
+}
+
+message IsTradingDayRequest {
+  common.Date date = 1;
+  string market = 2;
+}
+
+message IsTradingDayResponse {
+  bool is_trading_day = 1;
+}
+
+message GetNextTradingDayRequest {
+  common.Date date = 1;
+  string market = 2;
+  int32 offset = 3;  // 1 = next, -1 = previous, etc.
+}
+
+message GetNextTradingDayResponse {
+  common.Date date = 1;
+}
+
+// Historical data
+message GetOHLCVRequest {
+  common.SecurityId security_id = 1;
+  common.Date start_date = 2;
+  common.Date end_date = 3;
+}
+
+message GetOHLCVResponse {
+  repeated common.OHLCVBar bars = 1;
+}
+
+message GetAdjustedOHLCVRequest {
+  common.SecurityId security_id = 1;
+  common.Date start_date = 2;
+  common.Date end_date = 3;
+  string adjust_type = 4;  // FORWARD, BACKWARD
+}
+
+message GetAdjustedOHLCVResponse {
+  repeated common.OHLCVBar bars = 1;
+}
+
+// Real-time data
+message GetQuoteRequest {
+  common.SecurityId security_id = 1;
+}
+
+message GetQuoteResponse {
+  Quote quote = 1;
+}
+
+message GetQuotesRequest {
+  repeated common.SecurityId security_ids = 1;
+}
+
+message GetQuotesResponse {
+  repeated Quote quotes = 1;
+}
+
+message SubscribeQuotesRequest {
+  repeated common.SecurityId security_ids = 1;
+}
+
+// Industry
+message GetStockIndustryRequest {
+  common.SecurityId security_id = 1;
+  common.IndustryClassification classification = 2;
+  common.Date date = 3;
+}
+
+message GetStockIndustryResponse {
+  common.Industry industry = 1;
+}
+
+message ListIndustriesRequest {
+  common.IndustryClassification classification = 1;
+  int32 level = 2;  // 1, 2, or 3
+}
+
+message ListIndustriesResponse {
+  repeated common.Industry industries = 1;
+}
+
+// Data update
+message TriggerDataUpdateRequest {
+  string update_type = 1;  // DAILY, REALTIME, FACTOR, ALL
+  common.Date date = 2;
+  bool force = 3;
+}
+
+message TriggerDataUpdateResponse {
+  string task_id = 1;
+  string status = 2;
+}
+
+message GetDataUpdateStatusRequest {
+  string task_id = 1;
+}
+
+message GetDataUpdateStatusResponse {
+  string task_id = 1;
+  string status = 2;  // PENDING, RUNNING, COMPLETED, FAILED
+  string message = 3;
+  int32 progress = 4;  // 0-100
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp completed_at = 6;
+}

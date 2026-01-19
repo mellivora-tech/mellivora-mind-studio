@@ -1,0 +1,129 @@
+# Development overrides
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # Go Services (for development, run locally with hot reload)
+  # ==========================================================================
+  
+  gateway:
+    build:
+      context: ../../gateway
+      dockerfile: Dockerfile
+    container_name: mellivora-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      GATEWAY_ENV: dev
+      REDIS_ADDR: redis:6379
+      NATS_URL: nats://nats:4222
+      SERVICE_ACCOUNT: account:9001
+      SERVICE_ORDER: order:9002
+      SERVICE_POSITION: position:9003
+      SERVICE_TRADE: trade:9004
+      SERVICE_DATA: data:9005
+      SERVICE_SCHEDULE: schedule:9006
+      SERVICE_CONFIG: config:9007
+      SERVICE_ALERT: alert:9008
+    depends_on:
+      - redis
+      - nats
+    networks:
+      - mellivora-net
+
+  account:
+    build:
+      context: ../../services/account
+      dockerfile: Dockerfile
+    container_name: mellivora-account
+    ports:
+      - "9001:9001"
+    environment:
+      SERVICE_PORT: 9001
+      DATABASE_URL: postgres://mellivora:mellivora_dev@postgres:5432/mellivora?sslmode=disable
+      REDIS_ADDR: redis:6379
+      NATS_URL: nats://nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - mellivora-net
+
+  # Add other services as they are implemented...
+  # order:
+  # position:
+  # trade:
+  # data:
+  # schedule:
+  # config:
+  # alert:
+
+  # ==========================================================================
+  # Python Compute Services
+  # ==========================================================================
+  
+  # risk:
+  #   build:
+  #     context: ../../compute/risk
+  #     dockerfile: Dockerfile
+  #   container_name: mellivora-risk
+  #   ports:
+  #     - "9101:9101"
+  #   environment:
+  #     SERVICE_PORT: 9101
+  #   networks:
+  #     - mellivora-net
+
+  # ==========================================================================
+  # Rust Core Services
+  # ==========================================================================
+  
+  # risk-engine:
+  #   build:
+  #     context: ../../core/risk-engine
+  #     dockerfile: Dockerfile
+  #   container_name: mellivora-risk-engine
+  #   ports:
+  #     - "9201:9201"
+  #   networks:
+  #     - mellivora-net
+
+  # ==========================================================================
+  # Node.js Agent Services
+  # ==========================================================================
+  
+  # plugin-agent:
+  #   build:
+  #     context: ../../agents/plugin-agent
+  #     dockerfile: Dockerfile
+  #   container_name: mellivora-plugin-agent
+  #   ports:
+  #     - "9301:9301"
+  #   networks:
+  #     - mellivora-net
+
+  # ==========================================================================
+  # Frontend
+  # ==========================================================================
+  
+  # frontend:
+  #   build:
+  #     context: ../../frontend
+  #     dockerfile: Dockerfile
+  #   container_name: mellivora-frontend
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     VITE_API_URL: http://localhost:8080
+  #   networks:
+  #     - mellivora-net
+
+networks:
+  mellivora-net:
+    driver: bridge

@@ -1,0 +1,270 @@
+syntax = "proto3";
+
+package mellivora.order;
+
+option go_package = "github.com/mellivora-mind/mellivora-mind-studio/gen/go/order";
+
+import "google/protobuf/timestamp.proto";
+import "common/types.proto";
+
+// ============================================================================
+// Order Model
+// ============================================================================
+
+// Order entity
+message Order {
+  // Basic info
+  string order_id = 1;
+  string account_id = 2;
+  common.SecurityId security_id = 3;
+  string name = 4;
+  common.Side side = 5;
+  common.Exchange exchange = 6;
+
+  // Order type
+  common.OrderType order_type = 10;
+  common.TimeInForce time_in_force = 11;
+
+  // Quantity and price
+  common.Decimal quantity = 20;
+  common.Decimal price = 21;
+  common.Decimal filled_qty = 22;
+  common.Decimal filled_amount = 23;
+  common.Decimal avg_price = 24;
+  common.Decimal unfilled_qty = 25;
+
+  // Status
+  common.OrderStatus status = 30;
+  string reject_reason = 31;
+
+  // Timestamps
+  google.protobuf.Timestamp create_time = 40;
+  google.protobuf.Timestamp submit_time = 41;
+  google.protobuf.Timestamp update_time = 42;
+  google.protobuf.Timestamp finish_time = 43;
+  google.protobuf.Timestamp cancel_time = 44;
+
+  // References
+  string strategy_id = 50;
+  string signal_id = 51;
+  string parent_order_id = 52;
+  string ref_order_id = 53;
+  string channel = 54;  // Trading channel used
+  string remark = 55;
+
+  // Child orders (for split orders)
+  repeated string child_order_ids = 60;
+
+  // Metadata
+  map<string, string> metadata = 70;
+}
+
+// Order validation result
+message ValidationResult {
+  bool valid = 1;
+  repeated string errors = 2;
+  repeated string warnings = 3;
+}
+
+// Order split configuration
+message SplitConfig {
+  int32 max_children = 1;           // Max number of child orders
+  common.Decimal min_qty = 2;       // Min quantity per child
+  common.Decimal max_qty = 3;       // Max quantity per child
+  int32 interval_seconds = 4;       // Time interval between children
+  repeated string channels = 5;     // Channels to route to
+}
+
+// ============================================================================
+// Service Definitions
+// ============================================================================
+
+service OrderService {
+  // Order CRUD
+  rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
+  rpc GetOrder(GetOrderRequest) returns (GetOrderResponse);
+  rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse);
+
+  // Order operations
+  rpc SubmitOrder(SubmitOrderRequest) returns (SubmitOrderResponse);
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
+  rpc ModifyOrder(ModifyOrderRequest) returns (ModifyOrderResponse);
+
+  // Batch operations
+  rpc CreateOrders(CreateOrdersRequest) returns (CreateOrdersResponse);
+  rpc SubmitOrders(SubmitOrdersRequest) returns (SubmitOrdersResponse);
+  rpc CancelOrders(CancelOrdersRequest) returns (CancelOrdersResponse);
+
+  // Validation
+  rpc ValidateOrder(ValidateOrderRequest) returns (ValidateOrderResponse);
+
+  // Order splitting
+  rpc SplitOrder(SplitOrderRequest) returns (SplitOrderResponse);
+
+  // Analysis
+  rpc GetOrderAnalysis(GetOrderAnalysisRequest) returns (GetOrderAnalysisResponse);
+
+  // Real-time updates (streaming)
+  rpc StreamOrderUpdates(StreamOrderUpdatesRequest) returns (stream OrderUpdate);
+}
+
+// ============================================================================
+// Request/Response Messages
+// ============================================================================
+
+message CreateOrderRequest {
+  string account_id = 1;
+  common.SecurityId security_id = 2;
+  common.Side side = 3;
+  common.OrderType order_type = 4;
+  common.TimeInForce time_in_force = 5;
+  common.Decimal quantity = 6;
+  common.Decimal price = 7;
+  string strategy_id = 8;
+  string signal_id = 9;
+  string remark = 10;
+  map<string, string> metadata = 11;
+}
+
+message CreateOrderResponse {
+  Order order = 1;
+  ValidationResult validation = 2;
+}
+
+message GetOrderRequest {
+  string order_id = 1;
+}
+
+message GetOrderResponse {
+  Order order = 1;
+}
+
+message ListOrdersRequest {
+  string account_id = 1;
+  common.OrderStatus status = 2;
+  common.Date date = 3;
+  common.SecurityId security_id = 4;
+  common.PageRequest page = 5;
+}
+
+message ListOrdersResponse {
+  repeated Order orders = 1;
+  common.PageResponse page = 2;
+}
+
+message SubmitOrderRequest {
+  string order_id = 1;
+  string channel = 2;  // Optional: specific channel to use
+}
+
+message SubmitOrderResponse {
+  Order order = 1;
+}
+
+message CancelOrderRequest {
+  string order_id = 1;
+  string reason = 2;
+}
+
+message CancelOrderResponse {
+  Order order = 1;
+}
+
+message ModifyOrderRequest {
+  string order_id = 1;
+  optional common.Decimal quantity = 2;
+  optional common.Decimal price = 3;
+}
+
+message ModifyOrderResponse {
+  Order order = 1;
+}
+
+// Batch operations
+message CreateOrdersRequest {
+  repeated CreateOrderRequest orders = 1;
+}
+
+message CreateOrdersResponse {
+  repeated Order orders = 1;
+  repeated ValidationResult validations = 2;
+}
+
+message SubmitOrdersRequest {
+  repeated string order_ids = 1;
+  string channel = 2;
+}
+
+message SubmitOrdersResponse {
+  repeated Order orders = 1;
+}
+
+message CancelOrdersRequest {
+  repeated string order_ids = 1;
+  string reason = 2;
+}
+
+message CancelOrdersResponse {
+  repeated Order orders = 1;
+}
+
+// Validation
+message ValidateOrderRequest {
+  CreateOrderRequest order = 1;
+}
+
+message ValidateOrderResponse {
+  ValidationResult validation = 1;
+}
+
+// Order splitting
+message SplitOrderRequest {
+  string order_id = 1;
+  SplitConfig config = 2;
+}
+
+message SplitOrderResponse {
+  Order parent_order = 1;
+  repeated Order child_orders = 2;
+}
+
+// Order analysis
+message ExecutionStats {
+  common.Decimal fill_rate = 1;
+  common.Decimal completion_rate = 2;
+  common.Decimal cancel_rate = 3;
+  common.Decimal rejection_rate = 4;
+  common.Decimal avg_fill_time_seconds = 5;
+}
+
+message SlippageStats {
+  common.Decimal avg_slippage = 1;
+  common.Decimal total_slippage = 2;
+  common.Decimal vwap_deviation = 3;
+  common.Decimal market_impact = 4;
+}
+
+message GetOrderAnalysisRequest {
+  string account_id = 1;
+  common.Date start_date = 2;
+  common.Date end_date = 3;
+}
+
+message GetOrderAnalysisResponse {
+  ExecutionStats execution = 1;
+  SlippageStats slippage = 2;
+  int64 total_orders = 3;
+  common.Decimal total_traded_amount = 4;
+}
+
+// Streaming updates
+message StreamOrderUpdatesRequest {
+  string account_id = 1;
+  repeated string order_ids = 2;  // Empty = all orders
+}
+
+message OrderUpdate {
+  Order order = 1;
+  string event_type = 2;  // CREATED, SUBMITTED, FILLED, PARTIAL, CANCELLED, REJECTED
+  google.protobuf.Timestamp timestamp = 3;
+}

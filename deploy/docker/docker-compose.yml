@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # Infrastructure Services
+  # ==========================================================================
+  
+  postgres:
+    image: postgres:16-alpine
+    container_name: mellivora-postgres
+    environment:
+      POSTGRES_USER: mellivora
+      POSTGRES_PASSWORD: mellivora_dev
+      POSTGRES_DB: mellivora
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../migrations/postgres:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mellivora"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mellivora-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: mellivora-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mellivora-net
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: mellivora-nats
+    ports:
+      - "4222:4222"   # Client connections
+      - "8222:8222"   # HTTP monitoring
+      - "6222:6222"   # Cluster routing
+    command: ["--jetstream", "--store_dir", "/data"]
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mellivora-net
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.1
+    container_name: mellivora-clickhouse
+    environment:
+      CLICKHOUSE_USER: mellivora
+      CLICKHOUSE_PASSWORD: mellivora_dev
+      CLICKHOUSE_DB: mellivora
+    ports:
+      - "8123:8123"   # HTTP interface
+      - "9000:9000"   # Native interface
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mellivora-net
+
+  # ==========================================================================
+  # Observability (Optional for dev)
+  # ==========================================================================
+  
+  # Uncomment for local observability
+  # grafana:
+  #   image: grafana/grafana:10.2.0
+  #   container_name: mellivora-grafana
+  #   ports:
+  #     - "3001:3000"
+  #   environment:
+  #     GF_SECURITY_ADMIN_PASSWORD: admin
+  #   volumes:
+  #     - grafana_data:/var/lib/grafana
+  #   networks:
+  #     - mellivora-net
+
+volumes:
+  postgres_data:
+  redis_data:
+  nats_data:
+  clickhouse_data:
+  clickhouse_logs:
+  # grafana_data:
+
+networks:
+  mellivora-net:
+    driver: bridge

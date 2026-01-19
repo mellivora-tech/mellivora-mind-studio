@@ -1,0 +1,243 @@
+syntax = "proto3";
+
+package mellivora.account;
+
+option go_package = "github.com/mellivora-mind/mellivora-mind-studio/gen/go/account";
+
+import "google/protobuf/timestamp.proto";
+import "common/types.proto";
+
+// ============================================================================
+// Account Model
+// ============================================================================
+
+// Account type enumeration
+enum AccountType {
+  ACCOUNT_TYPE_UNSPECIFIED = 0;
+  ACCOUNT_TYPE_SECURITIES = 1;
+  ACCOUNT_TYPE_FUTURES = 2;
+  ACCOUNT_TYPE_OPTIONS = 3;
+  ACCOUNT_TYPE_MULTI_ASSET = 4;
+}
+
+// Account status enumeration
+enum AccountStatus {
+  ACCOUNT_STATUS_UNSPECIFIED = 0;
+  ACCOUNT_STATUS_ACTIVE = 1;
+  ACCOUNT_STATUS_SUSPENDED = 2;
+  ACCOUNT_STATUS_CLOSED = 3;
+}
+
+// Account entity
+message Account {
+  // Basic info
+  string account_id = 1;
+  string account_name = 2;
+  AccountType account_type = 3;
+  string broker = 4;
+  string channel = 5;  // Trading channel plugin name
+  AccountStatus status = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+
+  // Cash info
+  common.Decimal total_asset = 10;
+  common.Decimal cash_balance = 11;
+  common.Decimal available_cash = 12;
+  common.Decimal frozen_cash = 13;
+  common.Decimal market_value = 14;
+  common.Decimal margin_used = 15;
+  common.Decimal margin_available = 16;
+
+  // Risk parameters
+  string risk_level = 20;
+  common.Decimal leverage = 21;
+  common.Decimal max_drawdown = 22;
+  common.Decimal warning_line = 23;
+  common.Decimal close_line = 24;
+
+  // Statistics
+  common.Decimal total_pnl = 30;
+  common.Decimal today_pnl = 31;
+  common.Decimal realized_pnl = 32;
+  common.Decimal unrealized_pnl = 33;
+  common.Decimal commission = 34;
+  common.Decimal turnover_rate = 35;
+
+  // Metadata
+  map<string, string> labels = 40;
+  map<string, string> config = 41;
+}
+
+// ============================================================================
+// Service Definitions
+// ============================================================================
+
+service AccountService {
+  // Account CRUD
+  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse);
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
+  rpc ListAccounts(ListAccountsRequest) returns (ListAccountsResponse);
+  rpc UpdateAccount(UpdateAccountRequest) returns (UpdateAccountResponse);
+  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
+
+  // Cash operations
+  rpc Deposit(DepositRequest) returns (DepositResponse);
+  rpc Withdraw(WithdrawRequest) returns (WithdrawResponse);
+  rpc FreezeCash(FreezeCashRequest) returns (FreezeCashResponse);
+  rpc UnfreezeCash(UnfreezeCashRequest) returns (UnfreezeCashResponse);
+
+  // Sync from channel
+  rpc SyncAccount(SyncAccountRequest) returns (SyncAccountResponse);
+
+  // Analysis
+  rpc GetAccountStats(GetAccountStatsRequest) returns (GetAccountStatsResponse);
+  rpc GetNAVHistory(GetNAVHistoryRequest) returns (GetNAVHistoryResponse);
+}
+
+// ============================================================================
+// Request/Response Messages
+// ============================================================================
+
+message CreateAccountRequest {
+  string account_name = 1;
+  AccountType account_type = 2;
+  string broker = 3;
+  string channel = 4;
+  map<string, string> config = 5;
+}
+
+message CreateAccountResponse {
+  Account account = 1;
+}
+
+message GetAccountRequest {
+  string account_id = 1;
+}
+
+message GetAccountResponse {
+  Account account = 1;
+}
+
+message ListAccountsRequest {
+  common.PageRequest page = 1;
+  AccountType account_type = 2;
+  AccountStatus status = 3;
+  string broker = 4;
+}
+
+message ListAccountsResponse {
+  repeated Account accounts = 1;
+  common.PageResponse page = 2;
+}
+
+message UpdateAccountRequest {
+  string account_id = 1;
+  optional string account_name = 2;
+  optional AccountStatus status = 3;
+  optional string risk_level = 4;
+  optional common.Decimal warning_line = 5;
+  optional common.Decimal close_line = 6;
+  map<string, string> labels = 7;
+  map<string, string> config = 8;
+}
+
+message UpdateAccountResponse {
+  Account account = 1;
+}
+
+message DeleteAccountRequest {
+  string account_id = 1;
+}
+
+message DeleteAccountResponse {}
+
+message DepositRequest {
+  string account_id = 1;
+  common.Decimal amount = 2;
+  string remark = 3;
+}
+
+message DepositResponse {
+  Account account = 1;
+}
+
+message WithdrawRequest {
+  string account_id = 1;
+  common.Decimal amount = 2;
+  string remark = 3;
+}
+
+message WithdrawResponse {
+  Account account = 1;
+}
+
+message FreezeCashRequest {
+  string account_id = 1;
+  common.Decimal amount = 2;
+  string reference_id = 3;  // e.g., order_id
+}
+
+message FreezeCashResponse {
+  Account account = 1;
+}
+
+message UnfreezeCashRequest {
+  string account_id = 1;
+  common.Decimal amount = 2;
+  string reference_id = 3;
+}
+
+message UnfreezeCashResponse {
+  Account account = 1;
+}
+
+message SyncAccountRequest {
+  string account_id = 1;
+}
+
+message SyncAccountResponse {
+  Account account = 1;
+  google.protobuf.Timestamp synced_at = 2;
+}
+
+message GetAccountStatsRequest {
+  string account_id = 1;
+  common.Date start_date = 2;
+  common.Date end_date = 3;
+}
+
+message AccountStats {
+  common.Decimal annualized_return = 1;
+  common.Decimal sharpe_ratio = 2;
+  common.Decimal max_drawdown = 3;
+  common.Decimal information_ratio = 4;
+  common.Decimal volatility = 5;
+  common.Decimal win_rate = 6;
+  common.Decimal avg_holding_period = 7;
+  common.Decimal turnover_rate = 8;
+}
+
+message GetAccountStatsResponse {
+  string account_id = 1;
+  AccountStats stats = 2;
+}
+
+message GetNAVHistoryRequest {
+  string account_id = 1;
+  common.Date start_date = 2;
+  common.Date end_date = 3;
+}
+
+message NAVPoint {
+  common.Date date = 1;
+  common.Decimal nav = 2;
+  common.Decimal total_asset = 3;
+  common.Decimal daily_return = 4;
+  common.Decimal cumulative_return = 5;
+}
+
+message GetNAVHistoryResponse {
+  string account_id = 1;
+  repeated NAVPoint nav_history = 2;
+}

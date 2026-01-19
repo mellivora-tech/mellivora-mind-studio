@@ -1,0 +1,269 @@
+syntax = "proto3";
+
+package mellivora.position;
+
+option go_package = "github.com/mellivora-mind/mellivora-mind-studio/gen/go/position";
+
+import "google/protobuf/timestamp.proto";
+import "common/types.proto";
+
+// ============================================================================
+// Position Model
+// ============================================================================
+
+// Position entity
+message Position {
+  // Basic info
+  string position_id = 1;
+  string account_id = 2;
+  common.SecurityId security_id = 3;
+  string name = 4;
+  common.Direction direction = 5;
+
+  // Quantity
+  common.Decimal quantity = 10;
+  common.Decimal available_qty = 11;
+  common.Decimal frozen_qty = 12;
+  common.Decimal today_buy_qty = 13;
+  common.Decimal today_sell_qty = 14;
+  common.Decimal lock_qty = 15;
+
+  // Price
+  common.Decimal cost_price = 20;
+  common.Decimal avg_price = 21;
+  common.Decimal last_price = 22;
+  common.Decimal open_price = 23;
+  common.Decimal settle_price = 24;  // For futures
+
+  // P&L
+  common.Decimal market_value = 30;
+  common.Decimal total_pnl = 31;
+  common.Decimal pnl_ratio = 32;
+  common.Decimal today_pnl = 33;
+  common.Decimal realized_pnl = 34;
+  common.Decimal unrealized_pnl = 35;
+
+  // Derivatives specific
+  common.Decimal margin = 40;
+  common.Decimal contract_multiplier = 41;
+  common.Date expire_date = 42;
+  common.Decimal strike_price = 43;
+  string option_type = 44;  // CALL/PUT
+
+  // Greeks (for options)
+  common.Decimal delta = 50;
+  common.Decimal gamma = 51;
+  common.Decimal theta = 52;
+  common.Decimal vega = 53;
+
+  // Timestamps
+  google.protobuf.Timestamp created_at = 60;
+  google.protobuf.Timestamp updated_at = 61;
+}
+
+// Position weight in portfolio
+message PositionWeight {
+  common.SecurityId security_id = 1;
+  string name = 2;
+  common.Decimal weight = 3;
+  common.Decimal quantity = 4;
+  common.Decimal market_value = 5;
+}
+
+// Target portfolio
+message TargetPortfolio {
+  string portfolio_id = 1;
+  string account_id = 2;
+  common.Date date = 3;
+  repeated PositionWeight weights = 4;
+  common.Decimal cash_weight = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+// ============================================================================
+// Service Definitions
+// ============================================================================
+
+service PositionService {
+  // Position CRUD
+  rpc GetPosition(GetPositionRequest) returns (GetPositionResponse);
+  rpc ListPositions(ListPositionsRequest) returns (ListPositionsResponse);
+  rpc UpdatePosition(UpdatePositionRequest) returns (UpdatePositionResponse);
+
+  // Position operations
+  rpc FreezePosition(FreezePositionRequest) returns (FreezePositionResponse);
+  rpc UnfreezePosition(UnfreezePositionRequest) returns (UnfreezePositionResponse);
+
+  // Sync from channel
+  rpc SyncPositions(SyncPositionsRequest) returns (SyncPositionsResponse);
+
+  // Portfolio targets
+  rpc SetTargetPortfolio(SetTargetPortfolioRequest) returns (SetTargetPortfolioResponse);
+  rpc GetTargetPortfolio(GetTargetPortfolioRequest) returns (GetTargetPortfolioResponse);
+  rpc GetTradeList(GetTradeListRequest) returns (GetTradeListResponse);
+
+  // Analysis
+  rpc GetPositionAnalysis(GetPositionAnalysisRequest) returns (GetPositionAnalysisResponse);
+  rpc GetPositionHistory(GetPositionHistoryRequest) returns (GetPositionHistoryResponse);
+}
+
+// ============================================================================
+// Request/Response Messages
+// ============================================================================
+
+message GetPositionRequest {
+  string position_id = 1;
+}
+
+message GetPositionResponse {
+  Position position = 1;
+}
+
+message ListPositionsRequest {
+  string account_id = 1;
+  common.AssetType asset_type = 2;
+  common.Direction direction = 3;
+  common.PageRequest page = 4;
+}
+
+message ListPositionsResponse {
+  repeated Position positions = 1;
+  common.PageResponse page = 2;
+}
+
+message UpdatePositionRequest {
+  string position_id = 1;
+  common.Decimal last_price = 2;  // Update market price
+}
+
+message UpdatePositionResponse {
+  Position position = 1;
+}
+
+message FreezePositionRequest {
+  string position_id = 1;
+  common.Decimal quantity = 2;
+  string reference_id = 3;  // e.g., order_id
+}
+
+message FreezePositionResponse {
+  Position position = 1;
+}
+
+message UnfreezePositionRequest {
+  string position_id = 1;
+  common.Decimal quantity = 2;
+  string reference_id = 3;
+}
+
+message UnfreezePositionResponse {
+  Position position = 1;
+}
+
+message SyncPositionsRequest {
+  string account_id = 1;
+}
+
+message SyncPositionsResponse {
+  repeated Position positions = 1;
+  google.protobuf.Timestamp synced_at = 2;
+}
+
+message SetTargetPortfolioRequest {
+  string account_id = 1;
+  common.Date date = 2;
+  repeated PositionWeight weights = 3;
+  common.Decimal cash_weight = 4;
+}
+
+message SetTargetPortfolioResponse {
+  TargetPortfolio portfolio = 1;
+}
+
+message GetTargetPortfolioRequest {
+  string account_id = 1;
+  common.Date date = 2;
+}
+
+message GetTargetPortfolioResponse {
+  TargetPortfolio portfolio = 1;
+}
+
+// Trade list item (what to buy/sell to reach target)
+message TradeItem {
+  common.SecurityId security_id = 1;
+  string name = 2;
+  common.Side side = 3;
+  common.Decimal quantity = 4;
+  common.Decimal current_weight = 5;
+  common.Decimal target_weight = 6;
+  common.Decimal weight_diff = 7;
+  common.Decimal estimated_amount = 8;
+}
+
+message GetTradeListRequest {
+  string account_id = 1;
+  common.Date date = 2;
+  common.Decimal max_cash_diff = 3;  // Max buy-sell difference (e.g., 500k)
+}
+
+message GetTradeListResponse {
+  repeated TradeItem buy_list = 1;
+  repeated TradeItem sell_list = 2;
+  common.Decimal total_buy_amount = 3;
+  common.Decimal total_sell_amount = 4;
+  common.Decimal cash_diff = 5;
+}
+
+// Position analysis
+message ConcentrationAnalysis {
+  common.Decimal top1_weight = 1;
+  common.Decimal top5_weight = 2;
+  common.Decimal top10_weight = 3;
+  common.Decimal hhi_index = 4;  // Herfindahl-Hirschman Index
+}
+
+message IndustryExposure {
+  string industry_code = 1;
+  string industry_name = 2;
+  common.Decimal weight = 3;
+  common.Decimal benchmark_weight = 4;
+  common.Decimal deviation = 5;
+}
+
+message FactorExposure {
+  string factor_name = 1;
+  common.Decimal exposure = 2;
+  common.Decimal benchmark_exposure = 3;
+  common.Decimal active_exposure = 4;
+}
+
+message GetPositionAnalysisRequest {
+  string account_id = 1;
+  string benchmark_code = 2;
+}
+
+message GetPositionAnalysisResponse {
+  ConcentrationAnalysis concentration = 1;
+  repeated IndustryExposure industry_exposures = 2;
+  repeated FactorExposure factor_exposures = 3;
+}
+
+message PositionSnapshot {
+  common.Date date = 1;
+  common.SecurityId security_id = 2;
+  common.Decimal quantity = 3;
+  common.Decimal weight = 4;
+  common.Decimal market_value = 5;
+}
+
+message GetPositionHistoryRequest {
+  string account_id = 1;
+  common.SecurityId security_id = 2;  // Optional: specific security
+  common.Date start_date = 3;
+  common.Date end_date = 4;
+}
+
+message GetPositionHistoryResponse {
+  repeated PositionSnapshot snapshots = 1;
+}

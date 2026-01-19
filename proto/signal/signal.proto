@@ -1,0 +1,271 @@
+syntax = "proto3";
+
+package mellivora.signal;
+
+option go_package = "github.com/mellivora-mind/mellivora-mind-studio/gen/go/signal";
+
+import "google/protobuf/timestamp.proto";
+import "common/types.proto";
+
+// ============================================================================
+// Signal Models
+// ============================================================================
+
+// Signal type enumeration
+enum SignalType {
+  SIGNAL_TYPE_UNSPECIFIED = 0;
+  SIGNAL_TYPE_TIMING = 1;    // Market timing signal
+  SIGNAL_TYPE_ALPHA = 2;     // Stock alpha signal
+  SIGNAL_TYPE_ML = 3;        // Machine learning signal
+}
+
+// Timing signal levels
+enum TimingLevel {
+  TIMING_LEVEL_UNSPECIFIED = 0;
+  TIMING_LEVEL_L0 = 1;  // Base market state
+  TIMING_LEVEL_L1 = 2;  // Level 1 timing
+  TIMING_LEVEL_L2 = 3;  // Level 2 timing
+  TIMING_LEVEL_L3 = 4;  // Level 3 timing
+}
+
+// Timing signal
+message TimingSignal {
+  string signal_id = 1;
+  TimingLevel level = 2;
+  common.Date date = 3;
+  double value = 4;              // Raw signal value
+  double position = 5;           // Target position (0-1)
+  string regime = 6;             // Market regime: BULL, BEAR, NEUTRAL
+  map<string, double> components = 7;  // Sub-signals
+  google.protobuf.Timestamp created_at = 8;
+}
+
+// Alpha score for a stock
+message AlphaScore {
+  common.SecurityId security_id = 1;
+  common.Date date = 2;
+  double raw_score = 3;
+  double normalized_score = 4;   // Rank-transformed or z-score
+  double percentile = 5;         // 0-100
+  map<string, double> factor_scores = 6;  // Individual factor scores
+}
+
+// Alpha signal (batch of scores)
+message AlphaSignal {
+  string signal_id = 1;
+  common.Date date = 2;
+  repeated AlphaScore scores = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+// ML prediction signal
+message MLSignal {
+  string signal_id = 1;
+  string model_name = 2;
+  string model_version = 3;
+  common.Date date = 4;
+  repeated AlphaScore predictions = 5;
+  map<string, double> model_metrics = 6;  // IC, IR, etc.
+  google.protobuf.Timestamp created_at = 7;
+}
+
+// Combined/synthesized signal
+message CombinedSignal {
+  string signal_id = 1;
+  common.Date date = 2;
+  
+  // Timing synthesis
+  double timing_position = 3;
+  
+  // Alpha synthesis
+  repeated AlphaScore alpha_scores = 4;
+  
+  // Source signals used
+  repeated string source_signal_ids = 5;
+  
+  google.protobuf.Timestamp created_at = 6;
+}
+
+// Signal backtest result
+message SignalBacktest {
+  string signal_id = 1;
+  common.Date start_date = 2;
+  common.Date end_date = 3;
+  
+  // IC metrics
+  double ic = 4;
+  double rank_ic = 5;
+  double icir = 6;
+  
+  // Group returns
+  repeated GroupReturn group_returns = 7;
+  
+  // Turnover
+  double avg_turnover = 8;
+  
+  // Decay
+  repeated DecayPoint decay_curve = 9;
+}
+
+message GroupReturn {
+  int32 group = 1;           // 1-5 for quintiles
+  double cumulative_return = 2;
+  double annualized_return = 3;
+  double sharpe = 4;
+}
+
+message DecayPoint {
+  int32 horizon_days = 1;
+  double ic = 2;
+}
+
+// ============================================================================
+// Service Definitions
+// ============================================================================
+
+service SignalService {
+  // Timing signals
+  rpc GetTimingSignal(GetTimingSignalRequest) returns (GetTimingSignalResponse);
+  rpc ListTimingSignals(ListTimingSignalsRequest) returns (ListTimingSignalsResponse);
+  rpc CalculateTimingSignal(CalculateTimingSignalRequest) returns (CalculateTimingSignalResponse);
+  
+  // Alpha signals
+  rpc GetAlphaSignal(GetAlphaSignalRequest) returns (GetAlphaSignalResponse);
+  rpc ListAlphaSignals(ListAlphaSignalsRequest) returns (ListAlphaSignalsResponse);
+  rpc CalculateAlphaSignal(CalculateAlphaSignalRequest) returns (CalculateAlphaSignalResponse);
+  
+  // ML signals
+  rpc GetMLSignal(GetMLSignalRequest) returns (GetMLSignalResponse);
+  rpc RunMLPrediction(RunMLPredictionRequest) returns (RunMLPredictionResponse);
+  
+  // Signal synthesis
+  rpc SynthesizeSignals(SynthesizeSignalsRequest) returns (SynthesizeSignalsResponse);
+  rpc GetCombinedSignal(GetCombinedSignalRequest) returns (GetCombinedSignalResponse);
+  
+  // Backtesting
+  rpc BacktestSignal(BacktestSignalRequest) returns (BacktestSignalResponse);
+}
+
+// ============================================================================
+// Request/Response Messages
+// ============================================================================
+
+// Timing signals
+message GetTimingSignalRequest {
+  TimingLevel level = 1;
+  common.Date date = 2;
+}
+
+message GetTimingSignalResponse {
+  TimingSignal signal = 1;
+}
+
+message ListTimingSignalsRequest {
+  TimingLevel level = 1;
+  common.Date start_date = 2;
+  common.Date end_date = 3;
+}
+
+message ListTimingSignalsResponse {
+  repeated TimingSignal signals = 1;
+}
+
+message CalculateTimingSignalRequest {
+  TimingLevel level = 1;
+  common.Date date = 2;
+  bool force_recalculate = 3;
+}
+
+message CalculateTimingSignalResponse {
+  TimingSignal signal = 1;
+}
+
+// Alpha signals
+message GetAlphaSignalRequest {
+  common.Date date = 1;
+}
+
+message GetAlphaSignalResponse {
+  AlphaSignal signal = 1;
+}
+
+message ListAlphaSignalsRequest {
+  common.Date start_date = 1;
+  common.Date end_date = 2;
+}
+
+message ListAlphaSignalsResponse {
+  repeated AlphaSignal signals = 1;
+}
+
+message CalculateAlphaSignalRequest {
+  common.Date date = 1;
+  repeated string factor_names = 2;  // Empty = all factors
+  string universe = 3;               // Stock universe: ALL, CSI300, CSI500, CSI1000
+  bool force_recalculate = 4;
+}
+
+message CalculateAlphaSignalResponse {
+  AlphaSignal signal = 1;
+}
+
+// ML signals
+message GetMLSignalRequest {
+  string model_name = 1;
+  common.Date date = 2;
+}
+
+message GetMLSignalResponse {
+  MLSignal signal = 1;
+}
+
+message RunMLPredictionRequest {
+  string model_name = 1;
+  common.Date date = 2;
+  string universe = 3;
+}
+
+message RunMLPredictionResponse {
+  MLSignal signal = 1;
+}
+
+// Signal synthesis
+message SynthesizeSignalsRequest {
+  common.Date date = 1;
+  
+  // Timing weights
+  map<string, double> timing_weights = 2;  // level -> weight
+  
+  // Alpha weights
+  map<string, double> alpha_weights = 3;   // factor -> weight
+  
+  // ML weight
+  double ml_weight = 4;
+}
+
+message SynthesizeSignalsResponse {
+  CombinedSignal signal = 1;
+}
+
+message GetCombinedSignalRequest {
+  common.Date date = 1;
+}
+
+message GetCombinedSignalResponse {
+  CombinedSignal signal = 1;
+}
+
+// Backtesting
+message BacktestSignalRequest {
+  SignalType signal_type = 1;
+  string signal_name = 2;         // e.g., "L0", "momentum", "lgbm_v1"
+  common.Date start_date = 3;
+  common.Date end_date = 4;
+  string universe = 5;
+  int32 num_groups = 6;           // For quintile analysis (default 5)
+  repeated int32 decay_horizons = 7;  // Days to check decay (e.g., [1,3,5,10,20])
+}
+
+message BacktestSignalResponse {
+  SignalBacktest result = 1;
+}
