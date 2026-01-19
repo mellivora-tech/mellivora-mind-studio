@@ -1,0 +1,35 @@
+[package]
+name = "market-data"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio.workspace = true
+tonic.workspace = true
+prost.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# High-performance collections
+dashmap = "5.5"
+parking_lot = "0.12"
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+
+[build-dependencies]
+tonic-build.workspace = true
+
+[[bench]]
+name = "tick_processing"
+harness = false

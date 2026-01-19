@@ -1,0 +1,36 @@
+[package]
+name = "optimizer-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio.workspace = true
+tonic.workspace = true
+prost.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+nalgebra.workspace = true
+ndarray.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Quadratic programming solver
+osqp = "0.6"
+
+# Sparse matrix support
+sprs = "0.11"
+
+[dev-dependencies]
+criterion.workspace = true
+proptest.workspace = true
+
+[build-dependencies]
+tonic-build.workspace = true
+
+[[bench]]
+name = "qp_solver"
+harness = false
