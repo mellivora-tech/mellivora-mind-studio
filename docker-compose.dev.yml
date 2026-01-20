@@ -38,5 +38,30 @@ services:
       postgres:
         condition: service_healthy
 
+  etl-engine:
+    build:
+      context: ./compute/etl-engine
+      dockerfile: Dockerfile
+    container_name: mellivora-etl-engine
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: mellivora
+      DB_SSLMODE: disable
+      SERVICE_PORT: 9106
+      SCHEDULER_ENABLED: "true"
+      SCHEDULER_POLL_INTERVAL: 60
+      LOG_LEVEL: INFO
+      TUSHARE_TOKEN: ${TUSHARE_TOKEN:-}
+    ports:
+      - "9106:9106"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      etl-config:
+        condition: service_started
+
 volumes:
   postgres_data:
