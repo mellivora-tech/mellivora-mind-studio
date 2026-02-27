@@ -197,12 +197,14 @@ lint-rust: ## Run Rust linter
 # Database
 # =============================================================================
 
-db-migrate: ## Run database migrations
-	@echo "Running PostgreSQL migrations..."
-	@for f in migrations/postgres/*.sql; do \
-		echo "Applying $$f..."; \
-		psql "postgresql://mellivora:mellivora_dev@localhost:5432/mellivora" -f "$$f"; \
-	done
+db-migrate: ## Run database migrations (set DATABASE_URL to override default local dev URL)
+	@PSQL_BIN="$(shell which psql 2>/dev/null || echo /opt/homebrew/opt/libpq/bin/psql)" \
+		bash scripts/db-migrate.sh migrations/postgres
+
+db-migrate-status: ## Show applied migrations
+	@psql "$${DATABASE_URL:-postgresql://mellivora:mellivora_dev@localhost:5432/mellivora}" \
+		-c "SELECT version, applied_at FROM schema_migrations ORDER BY applied_at;" 2>/dev/null \
+		|| echo "schema_migrations table not found — run make db-migrate first"
 
 db-migrate-clickhouse: ## Run ClickHouse migrations
 	@echo "Running ClickHouse migrations..."
